@@ -1,0 +1,57 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: RDS resources
+
+Parameters:
+  VpcId:
+    Type: String
+  DatabaseSubnetIds:
+    Type: CommaDelimitedList
+  DBUsername:
+    Type: String
+  DBPassword:
+    Type: String
+
+Resources:
+  MyDBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: "Subnet group for RDS instance"
+      SubnetIds: !Ref DatabaseSubnetIds
+
+  MyDBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "RDS security group"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: "0.0.0.0/0"
+
+  MyDBCluster:
+    Type: "AWS::RDS::DBCluster"
+    Properties:
+      Engine: "aurora-postgresql"
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref MyDBSubnetGroup
+      VpcSecurityGroupIds: 
+        - !Ref MyDBSecurityGroup
+
+  MyDBInstance:
+    Type: "AWS::RDS::DBInstance"
+    Properties:
+      DBClusterIdentifier: !Ref MyDBCluster
+      DBInstanceClass: "db.t3.medium"
+      Engine: "aurora-postgresql"
+      PubliclyAccessible: false
+
+Outputs:
+  DBEndpoint:
+    Description: "The endpoint of the RDS database"
+    Value: !GetAtt MyDBInstance.Endpoint.Address
+  DBSecurityGroupId:
+    Description: "RDS Security Group ID"
+    Value: !Ref MyDBSecurityGroup
