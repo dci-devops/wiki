@@ -197,6 +197,7 @@ Resources:
           sed -i "s/{{DB_USERNAME}}/${DBUsername}/g" docker-compose.yaml
           sed -i "s/{{DB_PASSWORD}}/${DBPassword}/g" docker-compose.yaml
           sed -i "s/{{DB_ENDPOINT}}/${DBEndpoint}/g" docker-compose.yaml
+          PGPASSWORD=${DBPassword} psql -h ${DBEndpoint} -U ${DBUsername} -c "CREATE DATABASE wikidb;"
           curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/setup.sh
           chmod +x setup.sh
           ./setup.sh
