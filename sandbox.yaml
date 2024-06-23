@@ -21,10 +21,6 @@ Parameters:
     AllowedPattern: "[a-zA-Z0-9]*"
     ConstraintDescription: "must contain only alphanumeric characters."
 
-  DBEndpoint:
-    Description: "The database endpoint"
-    Type: "String"
-
   LatestAmazonLinux2023AMI:
     Description: "The Amazon Linux 2023 AMI ID"
     Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
