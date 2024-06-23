@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: EC2 instance
+
+Parameters:
+  VpcId:
+    Type: String
+  WebServerSubnetId:
+    Type: String
+  DBSecurityGroupId:
+    Type: String
+  DBEndpoint:
+    Type: String
+  DBUsername:
+    Type: String
+  DBPassword:
+    Type: String
+  LatestAmazonLinux2023AMI:
+    Type: String
+
+Resources:
+  WebServerSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Web server security group"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref DBSecurityGroupId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
+
+  WebServerInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: "t3.medium"
+      KeyName: "wiki"  # Stellen Sie sicher, dass dieser KeyName existiert
+      SubnetId: !Ref WebServerSubnetId
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup
+      ImageId: !Ref LatestAmazonLinux2023AMI
+      IamInstanceProfile: "LabInstanceProfile"  # Vorhandenes IAM Instance Profile
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeSize: 100
+            VolumeType: gp3
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y git postgresql
+          cd /home/ec2-user
+          curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/setup.sh
+          curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/docker-compose.yaml
+          echo "DB_USERNAME=${DBUsername}" >> /home/ec2-user/.env
+          echo "DB_PASSWORD=${DBPassword}" >> /home/ec2-user/.env
+          echo "DB_ENDPOINT=${DBEndpoint}" >> /home/ec2-user/.env
+          sed -i "s/{{DB_USERNAME}}/${DBUsername}/g" docker-compose.yaml
+          sed -i "s/{{DB_PASSWORD}}/${DBPassword}/g" docker-compose.yaml
+          sed -i "s/{{DB_ENDPOINT}}/${DBEndpoint}/g" docker-compose.yaml
+          PGPASSWORD=${DBPassword} psql -h ${DBEndpoint} -U ${DBUsername} -c "CREATE DATABASE wikidb;"
+          chmod +x setup.sh
+          ./setup.sh
