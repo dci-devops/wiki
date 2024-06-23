@@ -51,6 +51,7 @@ Resources:
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: "10.0.16.0/20"
+      AvailabilityZone: "eu-central-1a"
       Tags:
         - Key: "Name"
           Value: "DatabaseSubnet"
@@ -86,67 +87,43 @@ Resources:
         - Key: "Name"
           Value: "PublicRouteTable"
 
-  DefaultRoute:
+  DefaultPublicRoute:
     Type: "AWS::EC2::Route"
     Properties:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: "0.0.0.0/0"
       GatewayId: !Ref MyInternetGateway
 
-  WebServerSubnetRouteTableAssociation:
+  PublicSubnetRouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
     Properties:
       SubnetId: !Ref WebServerSubnet
       RouteTableId: !Ref PublicRouteTable
 
-  DatabaseSubnetRouteTableAssociation:
-    Type: "AWS::EC2::SubnetRouteTableAssociation"
-    Properties:
-      SubnetId: !Ref DatabaseSubnet
-      RouteTableId: !Ref PublicRouteTable
-
-  DatabaseSubnet2RouteTableAssociation:
-    Type: "AWS::EC2::SubnetRouteTableAssociation"
-    Properties:
-      SubnetId: !Ref DatabaseSubnet2
-      RouteTableId: !Ref PublicRouteTable
-
   MyDBSubnetGroup:
     Type: "AWS::RDS::DBSubnetGroup"
     Properties:
-      DBSubnetGroupDescription: "Subnet group for RDS instance"
+      DBSubnetGroupDescription: "Subnet group for RDS DB instance"
       SubnetIds:
         - !Ref DatabaseSubnet
         - !Ref DatabaseSubnet2
-
-  MyDBSecurityGroup:
-    Type: "AWS::EC2::SecurityGroup"
-    Properties:
-      GroupDescription: "RDS security group"
-      VpcId: !Ref MyVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          SourceSecurityGroupId: !Ref WebServerSecurityGroup
-
-  MyDBCluster:
-    Type: "AWS::RDS::DBCluster"
-    Properties:
-      Engine: "aurora-postgresql"
-      MasterUsername: !Ref DBUsername
-      MasterUserPassword: !Ref DBPassword
-      DBSubnetGroupName: !Ref MyDBSubnetGroup
-      VpcSecurityGroupIds: 
-        - !Ref MyDBSecurityGroup
+      Tags:
+        - Key: "Name"
+          Value: "MyDBSubnetGroup"
 
   MyDBInstance:
     Type: "AWS::RDS::DBInstance"
     Properties:
-      DBClusterIdentifier: !Ref MyDBCluster
-      DBInstanceClass: "db.t3.medium"
+      DBInstanceIdentifier: "mydbinstance"
+      AllocatedStorage: 20
+      DBInstanceClass: "db.t3.micro"
       Engine: "aurora-postgresql"
       PubliclyAccessible: false
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref MyDBSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt WebServerSecurityGroup.GroupId
 
   WebServerSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
@@ -186,16 +163,22 @@ Resources:
           Ebs:
             VolumeSize: 100
             VolumeType: gp3
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Ref WebServerSubnet
+          GroupSet:
+            - !Ref WebServerSecurityGroup
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
           cd /home/ec2-user
           curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/docker-compose.yaml
-          DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${MyDBInstance} --query "DBInstances[0].Endpoint.Address" --output text --region ${AWS::Region})
+          DBENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${MyDBInstance} --query "DBInstances[0].Endpoint.Address" --output text --region ${AWS::Region})
           sed -i "s/{{DB_USERNAME}}/${DBUsername}/g" docker-compose.yaml
           sed -i "s/{{DB_PASSWORD}}/${DBPassword}/g" docker-compose.yaml
-          sed -i "s/{{DB_ENDPOINT}}/${DB_ENDPOINT}/g" docker-compose.yaml
-          PGPASSWORD=${DBPassword} psql -h ${DB_ENDPOINT} -U ${DBUsername} -c "CREATE DATABASE wikidb;"
+          sed -i "s/{{DB_ENDPOINT}}/$DBENDPOINT/g" docker-compose.yaml
+          PGPASSWORD=${DBPassword} psql -h $DBENDPOINT -U ${DBUsername} -c "CREATE DATABASE wikidb;"
           curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/setup.sh
           chmod +x setup.sh
           ./setup.sh
