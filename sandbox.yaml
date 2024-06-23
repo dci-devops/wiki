@@ -1,0 +1,190 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: This Stack is the basis of our project
+
+Parameters:
+  DBUsername:
+    Description: "The database admin account username"
+    Type: "String"
+    MinLength: "1"
+    MaxLength: "16"
+    Default: "dbadmin"
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: "must begin with a letter and contain only alphanumeric characters."
+
+  DBPassword:
+    Description: "The database admin account password"
+    Type: "String"
+    NoEcho: true
+    MinLength: "8"
+    MaxLength: "41"
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: "must contain only alphanumeric characters."
+
+  LatestAmazonLinux2023AMI:
+    Description: "The Amazon Linux 2023 AMI ID"
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+
+Resources:
+  MyVPC:
+    Type: "AWS::EC2::VPC"
+    Properties: 
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: "Name"
+          Value: "MyVPC"
+
+  WebServerSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: "10.0.0.0/20"
+      Tags:
+        - Key: "Name"
+          Value: "WebServerSubnet"
+
+  DatabaseSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: "10.0.16.0/20"
+      Tags:
+        - Key: "Name"
+          Value: "DatabaseSubnet"
+
+  DatabaseSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: "10.0.32.0/20"
+      AvailabilityZone: "eu-central-1b"
+      Tags:
+        - Key: "Name"
+          Value: "DatabaseSubnet2"
+
+  MyInternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: "MyInternetGateway"
+
+  AttachGateway:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref MyInternetGateway
+
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: "Name"
+          Value: "PublicRouteTable"
+
+  DefaultRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref MyInternetGateway
+
+  WebServerSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref WebServerSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  DatabaseSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref DatabaseSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  DatabaseSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref DatabaseSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  MyDBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: "Subnet group for RDS instance"
+      SubnetIds:
+        - !Ref DatabaseSubnet
+        - !Ref DatabaseSubnet2
+
+  MyDBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "RDS security group"
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref WebServerSecurityGroup
+
+  MyDBCluster:
+    Type: "AWS::RDS::DBCluster"
+    Properties:
+      Engine: "aurora-postgresql"
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref MyDBSubnetGroup
+      VpcSecurityGroupIds: 
+        - !Ref MyDBSecurityGroup
+
+  MyDBInstance:
+    Type: "AWS::RDS::DBInstance"
+    Properties:
+      DBClusterIdentifier: !Ref MyDBCluster
+      DBInstanceClass: "db.t3.medium"
+      Engine: "aurora-postgresql"
+      PubliclyAccessible: false
+
+  WebServerSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Web server security group"
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
+
+  WebServerInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      InstanceType: "t3.medium"
+      KeyName: "wiki"  # Stellen Sie sicher, dass dieser KeyName existiert
+      SubnetId: !Ref WebServerSubnet
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup
+      ImageId: !Ref LatestAmazonLinux2023AMI
+      IamInstanceProfile: "LabInstanceProfile"  # Vorhandenes IAM Instance Profile
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            VolumeSize: 100
+            VolumeType: gp3
+      Tags:
+        - Key: "Name"
+          Value: "WebServerInstance"
