@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Network resources
+
+Resources:
+  MyVPC:
+    Type: "AWS::EC2::VPC"
+    Properties: 
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: "Name"
+          Value: "MyVPC"
+
+  WebServerSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: "10.0.0.0/20"
+      Tags:
+        - Key: "Name"
+          Value: "WebServerSubnet"
+
+  DatabaseSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: "10.0.16.0/20"
+      Tags:
+        - Key: "Name"
+          Value: "DatabaseSubnet"
+
+  DatabaseSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: "10.0.32.0/20"
+      AvailabilityZone: "eu-central-1b"
+      Tags:
+        - Key: "Name"
+          Value: "DatabaseSubnet2"
+
+  MyInternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: "MyInternetGateway"
+
+  AttachGateway:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref MyInternetGateway
+
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref MyVPC
+      Tags:
+        - Key: "Name"
+          Value: "PublicRouteTable"
+
+  DefaultRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref MyInternetGateway
+
+  WebServerSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref WebServerSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  DatabaseSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref DatabaseSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  DatabaseSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref DatabaseSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+Outputs:
+  VpcId:
+    Description: "VPC ID"
+    Value: !Ref MyVPC
+  WebServerSubnetId:
+    Description: "Web Server Subnet ID"
+    Value: !Ref WebServerSubnet
+  DatabaseSubnetIds:
+    Description: "Database Subnet IDs"
+    Value: !Join [",", [!Ref DatabaseSubnet, !Ref DatabaseSubnet2]]
