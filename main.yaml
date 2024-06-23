@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Main template that includes network, RDS, and EC2 instance as nested stacks
+
+Parameters:
+  DBUsername:
+    Description: "The database admin account username"
+    Type: "String"
+    MinLength: "1"
+    MaxLength: "16"
+    Default: "dbadmin"
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: "must begin with a letter and contain only alphanumeric characters."
+
+  DBPassword:
+    Description: "The database admin account password"
+    Type: "String"
+    NoEcho: true
+    MinLength: "8"
+    MaxLength: "41"
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: "must contain only alphanumeric characters."
+
+  LatestAmazonLinux2023AMI:
+    Description: "The Amazon Linux 2023 AMI ID"
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+
+Resources:
+  NetworkStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "https://raw.githubusercontent.com/dci-devops/wiki/main/network.yaml"
+  
+  RDSStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "https://raw.githubusercontent.com/dci-devops/wiki/main/rds.yaml"
+      Parameters:
+        VpcId: !GetAtt NetworkStack.Outputs.VpcId
+        DatabaseSubnetIds: !GetAtt NetworkStack.Outputs.DatabaseSubnetIds
+        DBUsername: !Ref DBUsername
+        DBPassword: !Ref DBPassword
+
+  EC2Stack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: "https://raw.githubusercontent.com/dci-devops/wiki/main/ec2.yaml"
+      Parameters:
+        VpcId: !GetAtt NetworkStack.Outputs.VpcId
+        WebServerSubnetId: !GetAtt NetworkStack.Outputs.WebServerSubnetId
+        DBSecurityGroupId: !GetAtt RDSStack.Outputs.DBSecurityGroupId
+        DBEndpoint: !GetAtt RDSStack.Outputs.DBEndpoint
+        DBUsername: !Ref DBUsername
+        DBPassword: !Ref DBPassword
+        LatestAmazonLinux2023AMI: !Ref LatestAmazonLinux2023AMI
