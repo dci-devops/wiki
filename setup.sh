@@ -19,9 +19,5 @@ sudo curl -L "https://github.com/docker/compose/releases/download/v2.19.0/docker
 sudo chmod +x /usr/local/bin/docker-compose
 sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-# Clone the Git repository and navigate to the directory
-git clone https://github.com/<YOUR_GITHUB_USERNAME>/<YOUR_REPOSITORY>.git /home/ec2-user/your-repository
-cd /home/ec2-user/your-repository
-
 # Bring up Docker Compose services
 docker-compose up -d
