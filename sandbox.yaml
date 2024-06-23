@@ -175,12 +175,12 @@ Resources:
     DependsOn: MyDBInstance
     Properties:
       InstanceType: "t3.medium"
-      KeyName: "wiki"  # Stellen Sie sicher, dass dieser KeyName existiert
+      KeyName: "vockey"
       SubnetId: !Ref WebServerSubnet
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup
       ImageId: !Ref LatestAmazonLinux2023AMI
-      IamInstanceProfile: "LabInstanceProfile"  # Vorhandenes IAM Instance Profile
+      IamInstanceProfile: "LabInstanceProfile"
       BlockDeviceMappings:
         - DeviceName: "/dev/xvda"
           Ebs:
