@@ -21,6 +21,10 @@ Parameters:
     AllowedPattern: "[a-zA-Z0-9]*"
     ConstraintDescription: "must contain only alphanumeric characters."
 
+  DBEndpoint:
+    Description: "The database endpoint"
+    Type: "String"
+
   LatestAmazonLinux2023AMI:
     Description: "The Amazon Linux 2023 AMI ID"
     Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
@@ -185,6 +189,17 @@ Resources:
           Ebs:
             VolumeSize: 100
             VolumeType: gp3
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          cd /home/ec2-user
+          curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/docker-compose.yaml
+          sed -i "s/{{DB_USERNAME}}/${DBUsername}/g" docker-compose.yaml
+          sed -i "s/{{DB_PASSWORD}}/${DBPassword}/g" docker-compose.yaml
+          sed -i "s/{{DB_ENDPOINT}}/${DBEndpoint}/g" docker-compose.yaml
+          curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/setup.sh
+          chmod +x setup.sh
+          ./setup.sh
       Tags:
         - Key: "Name"
           Value: "WebServerInstance"
