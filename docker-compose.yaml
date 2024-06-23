@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  wiki:
+    image: requarks/wiki:latest
+    ports:
+      - "80:3000"
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: {{DB_ENDPOINT}}
+      DB_PORT: 5432
+      DB_USER: {{DB_USERNAME}}
+      DB_PASS: {{DB_PASSWORD}}
+      DB_NAME: wikidb
+    volumes:
+      - ./config:/var/wiki/config
+      - ./data:/var/wiki/data
+
