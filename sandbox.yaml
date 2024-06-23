@@ -194,8 +194,8 @@ Resources:
           DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${MyDBInstance} --query "DBInstances[0].Endpoint.Address" --output text --region ${AWS::Region})
           sed -i "s/{{DB_USERNAME}}/${DBUsername}/g" docker-compose.yaml
           sed -i "s/{{DB_PASSWORD}}/${DBPassword}/g" docker-compose.yaml
-          sed -i "s/{{DB_ENDPOINT}}/${DBEndpoint}/g" docker-compose.yaml
-          PGPASSWORD=${DBPassword} psql -h ${DBEndpoint} -U ${DBUsername} -c "CREATE DATABASE wikidb;"
+          sed -i "s/{{DB_ENDPOINT}}/${DB_ENDPOINT}/g" docker-compose.yaml
+          PGPASSWORD=${DBPassword} psql -h ${DB_ENDPOINT} -U ${DBUsername} -c "CREATE DATABASE wikidb;"
           curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/setup.sh
           chmod +x setup.sh
           ./setup.sh
