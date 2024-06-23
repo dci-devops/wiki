@@ -176,6 +176,7 @@ Resources:
 
   WebServerInstance:
     Type: "AWS::EC2::Instance"
+    DependsOn: MyDBInstance
     Properties:
       InstanceType: "t3.medium"
       KeyName: "wiki"  # Stellen Sie sicher, dass dieser KeyName existiert
@@ -194,6 +195,7 @@ Resources:
           #!/bin/bash
           cd /home/ec2-user
           curl -O https://raw.githubusercontent.com/dci-devops/wiki/main/docker-compose.yaml
+          DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier ${MyDBInstance} --query "DBInstances[0].Endpoint.Address" --output text --region ${AWS::Region})
           sed -i "s/{{DB_USERNAME}}/${DBUsername}/g" docker-compose.yaml
           sed -i "s/{{DB_PASSWORD}}/${DBPassword}/g" docker-compose.yaml
           sed -i "s/{{DB_ENDPOINT}}/${DBEndpoint}/g" docker-compose.yaml
